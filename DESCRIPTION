@@ -1,0 +1,29 @@
+Package: skilldown
+Title: Generate Documentation Websites for AI Agent Skill Collections
+Version: 0.0.0.9000
+Authors@R:
+    person("Lars", "Schöbitz", , "lars@lse.de", role = c("aut", "cre"))
+Description: Reads a repository of AI agent skills (directories with a
+    'SKILL.md' file carrying YAML frontmatter, following the
+    agentskills.io specification), generates a Quarto website
+    configuration around it (a home page from the README, a skills
+    reference index from the frontmatter, articles from 'docs/', news
+    from the changelog), and drives Quarto to render the site, the way
+    'pkgdown' does for R packages.
+License: MIT + file LICENSE
+URL: https://github.com/larnsce/skilldown
+BugReports: https://github.com/larnsce/skilldown/issues
+Imports:
+    cli,
+    fs,
+    quarto,
+    yaml
+Suggests:
+    testthat (>= 3.0.0),
+    withr
+Config/testthat/edition: 3
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 8.0.0
+SystemRequirements: Quarto command line tool
+    (<https://github.com/quarto-dev/quarto-cli>).
