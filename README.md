@@ -16,12 +16,34 @@ the README, a Skills reference index from the frontmatter, Articles from
 `docs/`, News from the changelog), and drives Quarto to render and
 publish it.
 
-## Status: design phase
+## Status: v0.1 pipeline working (dev branch)
 
-Nothing is implemented yet. The design was researched first and is
-recorded as issues; start at the
-[roadmap issue](https://github.com/larnsce/skilldown/issues) for scope
-and sequencing. The prior art the design leans on: pkgdown's API and
+The end-to-end pipeline is implemented: discovery and spec validation,
+tolerant frontmatter normalization, site generation and rendering, and
+the publish workflow helper. The v0.1 acceptance run renders
+larnsce/llm-wiki (48 pages) with zero broken links introduced by
+generation; the operationalized comparison lives in
+`dev/parity-checklist.md`. The design is recorded as issues; start at
+the [roadmap issue](https://github.com/larnsce/skilldown/issues) for
+scope and sequencing.
+
+## Usage
+
+```r
+# install.packages("pak")
+pak::pak("larnsce/skilldown")
+
+skilldown::build_site("path/to/skill-collection")
+skilldown::preview_site("path/to/skill-collection")
+
+# optional, run once:
+skilldown::skilldown_setup()            # editable site template
+skilldown::use_skilldown_github_pages() # publish workflow
+```
+
+Requires the Quarto command line tool. If it is not on the PATH, point
+the `QUARTO_PATH` environment variable at a bundled binary (RStudio
+ships one under `Contents/Resources/app/quarto/bin/quarto`). The prior art the design leans on: pkgdown's API and
 site structure, [altdoc](https://altdoc.etiennebacher.com)'s
 architecture for driving external generators from R, the
 [quarto](https://quarto-dev.github.io/quarto-r/) R package as the CLI
