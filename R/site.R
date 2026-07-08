@@ -257,7 +257,7 @@ generate_site <- function(src, work = fs::path(src, ".skilldown", "site")) {
     pages <- c(pages, skill_pages[i])
     aliases[as.character(fs::path_rel(fs::path(s$dir, "SKILL.md"), src))] <- skill_pages[i]
     refs <- skill_bundled(s, src)
-    refs <- refs[grepl("/references/", refs) & fs::path_ext(refs) == "md"]
+    refs <- refs[grepl("(^|/)references/", refs) & fs::path_ext(refs) == "md"]
     reference_pages[[i]] <- refs
     pages <- c(pages, refs)
   }
@@ -322,6 +322,14 @@ generate_site <- function(src, work = fs::path(src, ".skilldown", "site")) {
     if (s$rel_dir != ".") {
       fs::dir_create(fs::path_dir(dest_dir))
       fs::dir_copy(s$dir, dest_dir)
+    } else {
+      # A root skill: copy only its bundled subdirectories, never the
+      # whole repository, into the working directory.
+      for (sub in c("scripts", "references", "assets")) {
+        if (fs::dir_exists(fs::path(s$dir, sub))) {
+          fs::dir_copy(fs::path(s$dir, sub), fs::path(work, sub))
+        }
+      }
     }
     page <- render_skill_page(s, src, rendered = pages, aliases = aliases,
                               repo_url = repo_url)
