@@ -1,0 +1,18 @@
+# Quarto configuration template used by skilldown::build_site().
+# $SKILLDOWN_* variables are substituted on every render (altdoc-style).
+# Power users can edit a copy of this template in the collection's
+# skilldown/ settings directory (created by skilldown_setup()).
+
+project:
+  type: website
+  output-dir: _site
+  render:
+$SKILLDOWN_RENDER
+
+$SKILLDOWN_WEBSITE
+
+format:
+  html:
+    theme: $SKILLDOWN_THEME
+    toc: true
+    code-copy: true
