@@ -1,7 +1,23 @@
 # skilldown
 
+<!-- badges: start -->
+[![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
+<!-- badges: end -->
+
 Generate a documentation website for a collection of AI agent skills,
 the way [pkgdown](https://pkgdown.r-lib.org) does for R packages.
+
+> [!WARNING]
+> **Experimental. Not intended for general use.** This package is an
+> experiment, coded end to end by [Claude](https://www.anthropic.com/claude-code)
+> under my direction. The idea: skill collections today ship a README and
+> nothing else, and no tool introspects a collection to render a browsable
+> reference site the way pkgdown does for R packages. skilldown explores
+> whether that gap is worth filling. The API, the output, and the internals
+> may change or break without notice, and nothing here is production ready.
+> If the idea interests you, or you have thoughts on where it should go,
+> [opening an issue](https://github.com/larnsce/skilldown/issues) is very
+> welcome.
 
 Agent skills (the [agentskills.io](https://agentskills.io/specification)
 open standard, used by Claude Code and other agents) are directories
@@ -16,16 +32,17 @@ the README, a Skills reference index from the frontmatter, Articles from
 `docs/`, News from the changelog), and drives Quarto to render and
 publish it.
 
-## Status: v0.1 pipeline working (dev branch)
+## Status: early proof of concept (dev branch)
 
-The end-to-end pipeline is implemented: discovery and spec validation,
-tolerant frontmatter normalization, site generation and rendering, and
-the publish workflow helper. The v0.1 acceptance run renders
-larnsce/llm-wiki (48 pages) with zero broken links introduced by
-generation; the operationalized comparison lives in
-`dev/parity-checklist.md`. The design is recorded as issues; start at
-the [roadmap issue](https://github.com/larnsce/skilldown/issues) for
-scope and sequencing.
+An end-to-end pipeline runs at the proof-of-concept level: discovery and
+spec validation, tolerant frontmatter normalization, site generation and
+rendering, and the publish workflow helper. As one exploratory check, the
+pipeline rendered larnsce/llm-wiki (48 pages) without introducing broken
+links; the comparison it was measured against lives in
+`dev/parity-checklist.md`. Treat all of this as provisional and subject to
+change. The design so far is recorded as issues; start at the
+[roadmap issue](https://github.com/larnsce/skilldown/issues) for scope and
+current thinking.
 
 ## Usage
 
