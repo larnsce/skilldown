@@ -16,12 +16,16 @@ sd_exclude_dirs <- c(
 #' the repository root, and installed locations such as `.claude/skills/`.
 #'
 #' @param path Path to the root of a skill collection.
+#' @param exclude Globs, relative to `path`, of skills to drop: a skill is
+#'   excluded when its directory or its `SKILL.md` path matches. This is
+#'   the `exclude` key of [skilldown_config]; [build_site()] passes it.
 #' @return A data frame with one row per discovered skill: `skill_md` (path
 #'   to the file), `dir` (its directory), `rel_dir` (directory relative to
 #'   `path`; `"."` for a root skill) and `dir_name` (the directory name the
-#'   spec requires the skill `name` to match).
+#'   spec requires the skill `name` to match). The `excluded` attribute
+#'   lists the root-relative directories dropped by `exclude`.
 #' @export
-discover_skills <- function(path = ".") {
+discover_skills <- function(path = ".", exclude = character()) {
   path <- fs::path_abs(path)
   if (!fs::dir_exists(path)) {
     cli::cli_abort("{.path {path}} is not a directory.")
@@ -42,6 +46,12 @@ discover_skills <- function(path = ".") {
   files <- files[keep]
   rel <- rel[keep]
 
+  rel_dir_all <- as.character(fs::path_dir(rel))
+  dropped <- sd_excluded(rel_dir_all, exclude) | sd_excluded(as.character(rel), exclude)
+  excluded <- rel_dir_all[dropped]
+  files <- files[!dropped]
+  rel <- rel[!dropped]
+
   dir <- fs::path_dir(files)
   rel_dir <- fs::path_dir(rel)
   dir_name <- ifelse(
@@ -56,5 +66,7 @@ discover_skills <- function(path = ".") {
     dir_name = as.character(dir_name),
     stringsAsFactors = FALSE
   )
-  out[order(out$rel_dir), , drop = FALSE]
+  out <- out[order(out$rel_dir), , drop = FALSE]
+  attr(out, "excluded") <- excluded
+  out
 }

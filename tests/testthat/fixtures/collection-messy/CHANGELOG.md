@@ -2,4 +2,4 @@
 
 ## 0.0.1
 
-Fixture history.
+Fixture history. See the [security policy](SECURITY.md), which does not exist.

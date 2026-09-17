@@ -13,13 +13,17 @@ generate_site(src, work = fs::path(src, ".skilldown", "site"))
 }
 \value{
 Invisibly, a manifest list: \code{pages} (root-relative rendered
-paths), \code{skills}, \code{notes} (normalization and validation report) and
-\code{title}.
+paths), \code{skills}, \code{notes} (normalization and validation report),
+\code{broken_links} (relative links whose target does not exist in the
+source tree, one row per link with \code{file}, \code{target} and \code{resolved}),
+\code{excluded} (root-relative paths dropped by the configuration's
+\code{exclude} globs), \code{config} (the resolved configuration) and \code{title}.
 }
 \description{
 Builds the renderable tree for \code{\link[=build_site]{build_site()}}: home page, skills
 reference index and per-skill pages, articles from \verb{docs/}, news from
 \code{NEWS.md} or \code{CHANGELOG.md}, and a generated \verb{_quarto.yml}. The source
 collection is never modified; all normalization happens in the working
-copy.
+copy. An optional \verb{_skilldown.yml} overrides the defaults (see
+\link{skilldown_config}).
 }

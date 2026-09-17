@@ -58,6 +58,32 @@ skilldown::skilldown_setup()            # editable site template
 skilldown::use_skilldown_github_pages() # publish workflow
 ```
 
+### Configuration
+
+`build_site()` needs no configuration. An optional `_skilldown.yml` at
+the root of the collection overrides the defaults, with keys that mirror
+`_pkgdown.yml` where they transfer: `title`, `url` (Quarto's `site-url`),
+`theme` (or `bootswatch`), `news` (the changelog page), `exclude` (globs
+dropped from discovery and rendering), `navbar` (`left` and `right`
+entries added to, or replacing, the generated ones), and `reference` and
+`articles` (sections of the two index pages, each with a `title`, an
+optional `desc` and `contents` selectors). See `?skilldown_config` for
+the schema.
+
+```yaml
+title: My skills
+url: https://example.org/skills
+theme: flatly
+exclude:
+  - skills/wip-*
+reference:
+  - title: Core
+    desc: The skills to start with.
+    contents: [alpha, beta]
+  - title: Data
+    contents: [data-*]
+```
+
 Requires the Quarto command line tool. If it is not on the PATH, point
 the `QUARTO_PATH` environment variable at a bundled binary (RStudio
 ships one under `Contents/Resources/app/quarto/bin/quarto`). The prior art the design leans on: pkgdown's API and

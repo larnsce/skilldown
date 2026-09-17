@@ -1,0 +1,26 @@
+title: Configured Collection
+url: https://example.org/configured
+theme: flatly
+news: HISTORY.md
+exclude:
+  - skills/gamma
+  - docs/draft-*.md
+navbar:
+  left:
+    - text: News
+      href: HISTORY.md
+      icon: bi-clock-history
+  right:
+    - text: Docs
+      href: https://example.org/docs
+reference:
+  - title: Core
+    desc: The skills to start with.
+    contents: [alpha]
+  - title: Reporting
+    contents: ["be*"]
+articles:
+  - title: Start here
+    contents: [getting-started]
+surfaces:
+  agents: false

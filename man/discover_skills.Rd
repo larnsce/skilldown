@@ -4,16 +4,21 @@
 \alias{discover_skills}
 \title{Discover skills in a collection}
 \usage{
-discover_skills(path = ".")
+discover_skills(path = ".", exclude = character())
 }
 \arguments{
 \item{path}{Path to the root of a skill collection.}
+
+\item{exclude}{Globs, relative to \code{path}, of skills to drop: a skill is
+excluded when its directory or its \code{SKILL.md} path matches. This is
+the \code{exclude} key of \link{skilldown_config}; \code{\link[=build_site]{build_site()}} passes it.}
 }
 \value{
 A data frame with one row per discovered skill: \code{skill_md} (path
 to the file), \code{dir} (its directory), \code{rel_dir} (directory relative to
 \code{path}; \code{"."} for a root skill) and \code{dir_name} (the directory name the
-spec requires the skill \code{name} to match).
+spec requires the skill \code{name} to match). The \code{excluded} attribute
+lists the root-relative directories dropped by \code{exclude}.
 }
 \description{
 Finds every \code{SKILL.md} under \code{path} and groups each one by its parent
