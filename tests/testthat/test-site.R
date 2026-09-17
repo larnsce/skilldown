@@ -1,14 +1,3 @@
-generate_fixture <- function(name, env = parent.frame()) {
-  src <- local_fixture(name, env = env)
-  work <- fs::path(withr::local_tempdir(.local_envir = env), "site")
-  manifest <- suppressWarnings(generate_site(src, work = work))
-  list(src = src, work = work, manifest = manifest)
-}
-
-read_work <- function(x, rel) {
-  paste(readLines(fs::path(x$work, rel), warn = FALSE), collapse = "\n")
-}
-
 test_that("generation snapshot: basic collection", {
   x <- generate_fixture("collection-basic")
   expect_snapshot(cat(sort(x$manifest$pages), sep = "\n"))

@@ -49,6 +49,11 @@ build_site <- function(path = ".", dest = "_site", quiet = FALSE) {
   cli::cli_alert_success(
     "Built site for {.strong {manifest$title}}: {length(manifest$pages)} page{?s} in {.path {dest_dir}}."
   )
+  if (length(manifest$excluded) > 0) {
+    cli::cli_alert_info(
+      "Excluded by {.path _skilldown.yml}: {.path {manifest$excluded}}."
+    )
+  }
   if (manifest$n_normalized > 0) {
     cli::cli_alert_info(
       "Normalized frontmatter in {manifest$n_normalized} file{?s} (working copy only; sources untouched)."

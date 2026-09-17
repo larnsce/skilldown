@@ -1,5 +1,8 @@
 # Small helpers shared across the pipeline.
 
+# `x` unless it is NULL, then `y` (base R's `%||%` needs R 4.4).
+sd_or <- function(x, y) if (is.null(x)) y else x
+
 # yaml::as.yaml() writes YAML 1.1 booleans (yes/no); Quarto reads YAML
 # 1.2 and rejects them. Emit true/false verbatim.
 sd_yaml <- function(x) {

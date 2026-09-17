@@ -4,10 +4,11 @@
 sd_theme_default <- "cosmo"
 
 # Read and validate every skill in the collection. Returns a list with
-# `skills` (kept) and `notes` (data.frame file/note across all, including
-# skipped ones).
-read_collection <- function(src) {
-  found <- discover_skills(src)
+# `skills` (kept), `notes` (data.frame file/note across all, including
+# skipped ones) and `excluded` (root-relative skill directories dropped
+# by the configuration's `exclude` globs).
+read_collection <- function(src, exclude = character()) {
+  found <- discover_skills(src, exclude = exclude)
   skills <- list()
   notes <- data.frame(file = character(), note = character())
   for (i in seq_len(nrow(found))) {
@@ -25,7 +26,7 @@ read_collection <- function(src) {
       skills[[length(skills) + 1]] <- skill
     }
   }
-  list(skills = skills, notes = notes)
+  list(skills = skills, notes = notes, excluded = attr(found, "excluded"))
 }
 
 # Root-relative path of the generated page for a skill.
@@ -201,15 +202,17 @@ page_title <- function(file) {
 #' reference index and per-skill pages, articles from `docs/`, news from
 #' `NEWS.md` or `CHANGELOG.md`, and a generated `_quarto.yml`. The source
 #' collection is never modified; all normalization happens in the working
-#' copy.
+#' copy. An optional `_skilldown.yml` overrides the defaults (see
+#' [skilldown_config]).
 #'
 #' @param src Path to the skill collection.
 #' @param work Path of the working directory to (re)generate.
 #' @return Invisibly, a manifest list: `pages` (root-relative rendered
 #'   paths), `skills`, `notes` (normalization and validation report),
 #'   `broken_links` (relative links whose target does not exist in the
-#'   source tree, one row per link with `file`, `target` and `resolved`)
-#'   and `title`.
+#'   source tree, one row per link with `file`, `target` and `resolved`),
+#'   `excluded` (root-relative paths dropped by the configuration's
+#'   `exclude` globs), `config` (the resolved configuration) and `title`.
 #' @export
 generate_site <- function(src, work = fs::path(src, ".skilldown", "site")) {
   src <- fs::path_abs(src)
@@ -217,11 +220,13 @@ generate_site <- function(src, work = fs::path(src, ".skilldown", "site")) {
   if (fs::dir_exists(work)) fs::dir_delete(work)
   fs::dir_create(work)
 
-  collection <- read_collection(src)
+  cfg <- read_config(src)
+  collection <- read_collection(src, exclude = cfg$exclude)
   skills <- collection$skills
   notes <- collection$notes
+  excluded <- collection$excluded
   repo_url <- repo_browse_url(src)
-  title <- fs::path_file(src)
+  title <- sd_or(cfg$title, fs::path_file(src))
   # Missing link targets, collected across every rewritten page
   # (issue #11).
   report <- new.env(parent = emptyenv())
@@ -246,10 +251,21 @@ generate_site <- function(src, work = fs::path(src, ".skilldown", "site")) {
     aliases["README.md"] <- "index.md"
   }
   news_file <- NULL
-  for (cand in c("NEWS.md", "CHANGELOG.md")) {
-    if (fs::file_exists(fs::path(src, cand))) {
-      news_file <- cand
-      break
+  if (!is.null(cfg$news)) {
+    if (fs::file_exists(fs::path(src, cfg$news))) {
+      news_file <- cfg$news
+    } else {
+      cli::cli_warn(
+        "{.path _skilldown.yml}: {.field news} names {.path {cfg$news}}, which does not exist; looking for NEWS.md or CHANGELOG.md instead."
+      )
+    }
+  }
+  if (is.null(news_file)) {
+    for (cand in c("NEWS.md", "CHANGELOG.md")) {
+      if (fs::file_exists(fs::path(src, cand))) {
+        news_file <- cand
+        break
+      }
     }
   }
   if (!is.null(news_file)) pages <- c(pages, news_file)
@@ -260,6 +276,9 @@ generate_site <- function(src, work = fs::path(src, ".skilldown", "site")) {
       fs::dir_ls(fs::path(src, "docs"), type = "file", glob = "*.md"),
       src
     ))
+    dropped <- sd_excluded(articles, cfg$exclude)
+    excluded <- c(excluded, articles[dropped])
+    articles <- setdiff(articles[!dropped], news_file)
     pages <- c(pages, articles)
   }
 
@@ -391,12 +410,34 @@ generate_site <- function(src, work = fs::path(src, ".skilldown", "site")) {
       s$name, link, cell(first_sentence(s$meta$description))
     )
   }, character(1))
+  table_header <- c("| Skill | Description |", "|-------|-------------|")
+  skills_body <- c(table_header, index_rows)
+  if (!is.null(cfg$reference)) {
+    # Sectioned index (issue #5): a skill is selected by its name or its
+    # directory, and lands in the first section that names it.
+    forms <- list(
+      vapply(skills, `[[`, character(1), "name"),
+      vapply(skills, `[[`, character(1), "rel_dir")
+    )
+    selected <- lapply(cfg$reference, function(sec) sd_select(sec$contents, forms))
+    sectioned <- sd_sectioned(
+      cfg$reference, selected, index_rows, table_header, "Other skills"
+    )
+    skills_body <- sectioned$lines
+    if (length(sectioned$leftover) > 0) {
+      notes <- rbind(notes, data.frame(
+        file = "_skilldown.yml",
+        note = sprintf(
+          "no reference section lists %s; appended under Other skills",
+          paste(sprintf("`%s`", forms[[1]][sectioned$leftover]), collapse = ", ")
+        )
+      ))
+    }
+  }
   writeLines(c(
     "---", "title: Skills", "---", "",
     sprintf("%d skills in this collection.", length(skills)), "",
-    "| Skill | Description |",
-    "|-------|-------------|",
-    index_rows
+    skills_body
   ), fs::path(work, "reference", "skills.md"), useBytes = TRUE)
 
   if (length(articles) > 0) {
@@ -407,8 +448,30 @@ generate_site <- function(src, work = fs::path(src, ".skilldown", "site")) {
         as.character(fs::path_rel(f, "reference"))
       )
     }, character(1), USE.NAMES = FALSE)
+    articles_body <- article_rows
+    if (!is.null(cfg$articles)) {
+      forms <- list(
+        articles,
+        sub("^docs/", "", articles),
+        as.character(fs::path_ext_remove(fs::path_file(articles)))
+      )
+      selected <- lapply(cfg$articles, function(sec) sd_select(sec$contents, forms))
+      sectioned <- sd_sectioned(
+        cfg$articles, selected, article_rows, character(), "Other articles"
+      )
+      articles_body <- sectioned$lines
+      if (length(sectioned$leftover) > 0) {
+        notes <- rbind(notes, data.frame(
+          file = "_skilldown.yml",
+          note = sprintf(
+            "no articles section lists %s; appended under Other articles",
+            paste(sprintf("`%s`", articles[sectioned$leftover]), collapse = ", ")
+          )
+        ))
+      }
+    }
     writeLines(c(
-      "---", "title: Articles", "---", "", article_rows
+      "---", "title: Articles", "---", "", articles_body
     ), fs::path(work, "reference", "articles.md"), useBytes = TRUE)
   }
 
@@ -426,13 +489,19 @@ generate_site <- function(src, work = fs::path(src, ".skilldown", "site")) {
   if (!is.null(news_file)) {
     navbar_left <- c(navbar_left, list(list(text = "News", href = news_file)))
   }
-  website <- list(
-    title = title,
-    `page-navigation` = TRUE,
-    navbar = c(
-      list(left = navbar_left),
-      if (!is.na(repo_url)) list(right = list(list(icon = "github", href = repo_url))),
-      list(search = TRUE)
+  navbar_right <- if (!is.na(repo_url)) list(list(icon = "github", href = repo_url))
+  navbar_left <- sd_merge_navbar(navbar_left, cfg$navbar$left)
+  navbar_right <- sd_merge_navbar(navbar_right, cfg$navbar$right)
+  website <- c(
+    list(title = title),
+    if (!is.null(cfg$url)) list(`site-url` = cfg$url),
+    list(
+      `page-navigation` = TRUE,
+      navbar = c(
+        list(left = navbar_left),
+        if (length(navbar_right) > 0) list(right = navbar_right),
+        list(search = TRUE)
+      )
     )
   )
   if (!is.na(repo_url)) {
@@ -446,7 +515,8 @@ generate_site <- function(src, work = fs::path(src, ".skilldown", "site")) {
                 paste(sprintf("    - %s", pages), collapse = "\n"),
                 config, fixed = TRUE)
   config <- sub("$SKILLDOWN_WEBSITE", website_yaml, config, fixed = TRUE)
-  config <- sub("$SKILLDOWN_THEME", sd_theme_default, config, fixed = TRUE)
+  config <- sub("$SKILLDOWN_THEME", sd_or(cfg$theme, sd_theme_default),
+                config, fixed = TRUE)
   writeLines(config, fs::path(work, "_quarto.yml"), useBytes = TRUE)
 
   invisible(list(
@@ -454,6 +524,8 @@ generate_site <- function(src, work = fs::path(src, ".skilldown", "site")) {
     skills = vapply(skills, `[[`, character(1), "name"),
     notes = notes,
     broken_links = report$links,
+    excluded = as.character(excluded),
+    config = cfg,
     n_normalized = n_normalized,
     title = title,
     work = as.character(work)
