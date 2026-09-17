@@ -55,9 +55,11 @@ cell <- function(x) {
 # Generate the markdown page for one skill: description, frontmatter
 # table, the SKILL.md body verbatim, and the bundled-file listing
 # (issue #4).
-render_skill_page <- function(skill, src, rendered, aliases, repo_url) {
+render_skill_page <- function(skill, src, rendered, aliases, repo_url,
+                              report = NULL) {
   meta <- skill$meta
   page_dir <- if (skill$rel_dir == ".") "." else skill$rel_dir
+  skill_md <- as.character(fs::path_rel(fs::path(skill$dir, "SKILL.md"), src))
 
   fields <- c(
     Name = sprintf("`%s`", skill$name),
@@ -96,7 +98,7 @@ render_skill_page <- function(skill, src, rendered, aliases, repo_url) {
   body_text <- rewrite_links(
     paste(body, collapse = "\n"),
     page_rel_dir = page_dir, rendered = rendered, aliases = aliases,
-    repo_url = repo_url, root = src
+    repo_url = repo_url, root = src, report = report, page = skill_md
   )
 
   bundled <- skill_bundled(skill, src)
@@ -139,9 +141,11 @@ render_skill_page <- function(skill, src, rendered, aliases, repo_url) {
 # Copy a markdown page into the working directory, normalizing its
 # frontmatter to strict YAML and applying the title fallback chain and
 # link rewriting (issue #6). Returns TRUE when normalization changed the
-# frontmatter.
+# frontmatter. `report` collects missing link targets (issue #11); the
+# page is reported under its root-relative source path.
 normalize_page <- function(src_file, work_file, page_rel_dir, rendered,
-                           aliases, repo_url, root, fallback_title) {
+                           aliases, repo_url, root, fallback_title,
+                           report = NULL) {
   lines <- readLines(src_file, warn = FALSE, encoding = "UTF-8")
   parts <- split_frontmatter(lines)
   normalized <- FALSE
@@ -162,7 +166,8 @@ normalize_page <- function(src_file, work_file, page_rel_dir, rendered,
   body <- rewrite_links(
     paste(parts$body, collapse = "\n"),
     page_rel_dir = page_rel_dir, rendered = rendered, aliases = aliases,
-    repo_url = repo_url, root = root
+    repo_url = repo_url, root = root, report = report,
+    page = as.character(fs::path_rel(src_file, root))
   )
   out <- if (length(meta) > 0) {
     c("---", sd_yaml(meta), "---", "", body)
@@ -201,8 +206,10 @@ page_title <- function(file) {
 #' @param src Path to the skill collection.
 #' @param work Path of the working directory to (re)generate.
 #' @return Invisibly, a manifest list: `pages` (root-relative rendered
-#'   paths), `skills`, `notes` (normalization and validation report) and
-#'   `title`.
+#'   paths), `skills`, `notes` (normalization and validation report),
+#'   `broken_links` (relative links whose target does not exist in the
+#'   source tree, one row per link with `file`, `target` and `resolved`)
+#'   and `title`.
 #' @export
 generate_site <- function(src, work = fs::path(src, ".skilldown", "site")) {
   src <- fs::path_abs(src)
@@ -215,6 +222,13 @@ generate_site <- function(src, work = fs::path(src, ".skilldown", "site")) {
   notes <- collection$notes
   repo_url <- repo_browse_url(src)
   title <- fs::path_file(src)
+  # Missing link targets, collected across every rewritten page
+  # (issue #11).
+  report <- new.env(parent = emptyenv())
+  report$links <- data.frame(
+    file = character(), target = character(), resolved = character(),
+    stringsAsFactors = FALSE
+  )
 
   # --- what will exist as rendered pages (root-relative), and how
   # SKILL.md links map onto generated pages
@@ -298,7 +312,8 @@ generate_site <- function(src, work = fs::path(src, ".skilldown", "site")) {
     n_normalized <- n_normalized + normalize_page(
       fs::path(src, home_src), fs::path(work, "index.md"),
       page_rel_dir = ".", rendered = pages, aliases = aliases,
-      repo_url = repo_url, root = src, fallback_title = title
+      repo_url = repo_url, root = src, fallback_title = title,
+      report = report
     )
   } else {
     writeLines(c("---", sprintf("title: %s", title), "---"), fs::path(work, "index.md"))
@@ -311,7 +326,8 @@ generate_site <- function(src, work = fs::path(src, ".skilldown", "site")) {
       fs::path(src, f), fs::path(work, f),
       page_rel_dir = as.character(fs::path_dir(f)), rendered = pages,
       aliases = aliases, repo_url = repo_url, root = src,
-      fallback_title = fs::path_ext_remove(fs::path_file(f))
+      fallback_title = fs::path_ext_remove(fs::path_file(f)),
+      report = report
     )
   }
 
@@ -332,7 +348,7 @@ generate_site <- function(src, work = fs::path(src, ".skilldown", "site")) {
       }
     }
     page <- render_skill_page(s, src, rendered = pages, aliases = aliases,
-                              repo_url = repo_url)
+                              repo_url = repo_url, report = report)
     writeLines(page, fs::path(work, skill_pages[i]), useBytes = TRUE)
     # Normalize the frontmatter of rendered reference pages in place.
     for (ref in reference_pages[[i]]) {
@@ -340,7 +356,8 @@ generate_site <- function(src, work = fs::path(src, ".skilldown", "site")) {
         fs::path(src, ref), fs::path(work, ref),
         page_rel_dir = as.character(fs::path_dir(ref)), rendered = pages,
         aliases = aliases, repo_url = repo_url, root = src,
-        fallback_title = fs::path_ext_remove(fs::path_file(ref))
+        fallback_title = fs::path_ext_remove(fs::path_file(ref)),
+        report = report
       )
     }
   }
@@ -358,7 +375,8 @@ generate_site <- function(src, work = fs::path(src, ".skilldown", "site")) {
         fs::path(src, ref), fs::path(work, ref),
         page_rel_dir = as.character(fs::path_dir(ref)), rendered = pages,
         aliases = aliases, repo_url = repo_url, root = src,
-        fallback_title = fs::path_ext_remove(fs::path_file(ref))
+        fallback_title = fs::path_ext_remove(fs::path_file(ref)),
+        report = report
       )
     }
   }
@@ -435,6 +453,7 @@ generate_site <- function(src, work = fs::path(src, ".skilldown", "site")) {
     pages = pages,
     skills = vapply(skills, `[[`, character(1), "name"),
     notes = notes,
+    broken_links = report$links,
     n_normalized = n_normalized,
     title = title,
     work = as.character(work)

@@ -13,8 +13,10 @@ generate_site(src, work = fs::path(src, ".skilldown", "site"))
 }
 \value{
 Invisibly, a manifest list: \code{pages} (root-relative rendered
-paths), \code{skills}, \code{notes} (normalization and validation report) and
-\code{title}.
+paths), \code{skills}, \code{notes} (normalization and validation report),
+\code{broken_links} (relative links whose target does not exist in the
+source tree, one row per link with \code{file}, \code{target} and \code{resolved})
+and \code{title}.
 }
 \description{
 Builds the renderable tree for \code{\link[=build_site]{build_site()}}: home page, skills

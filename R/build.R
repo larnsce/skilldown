@@ -24,7 +24,10 @@ check_quarto <- function() {
 #'
 #' Regenerates the working directory (see [generate_site()]), renders it
 #' with Quarto, and copies the result to `dest`. The collection itself is
-#' never modified.
+#' never modified. The build never fails on the content it finds: frontmatter
+#' it had to normalize, validation notes, and relative links whose target
+#' does not exist in the source tree are reported after the render so the
+#' author can fix them upstream.
 #'
 #' @param path Path to the skill collection.
 #' @param dest Output directory for the rendered site, relative to
@@ -54,6 +57,18 @@ build_site <- function(path = ".", dest = "_site", quiet = FALSE) {
   if (nrow(manifest$notes) > 0) {
     cli::cli_alert_warning("{nrow(manifest$notes)} validation note{?s}:")
     cli::cli_ul(sprintf("%s: %s", manifest$notes$file, manifest$notes$note))
+  }
+  # Source-side broken links (issue #11): generation leaves them as
+  # written because there is nothing to link to; the author fixes them
+  # upstream.
+  if (nrow(manifest$broken_links) > 0) {
+    cli::cli_alert_warning(paste(
+      "{nrow(manifest$broken_links)} link{?s} whose target does not exist",
+      "in the source (left as written):"
+    ))
+    cli::cli_ul(sprintf(
+      "%s: %s", manifest$broken_links$file, manifest$broken_links$target
+    ))
   }
   invisible(manifest)
 }

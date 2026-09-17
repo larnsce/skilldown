@@ -44,22 +44,40 @@ image_exts <- c("png", "jpg", "jpeg", "gif", "svg", "webp", "avif")
 # - image links stay relative (the files are copied alongside),
 # - links to existing files outside the rendered set point to the
 #   repository blob URL instead of a 404,
-# - absolute URLs, anchors and mailto links are left alone.
+# - absolute URLs, anchors and mailto links are left alone,
+# - a relative link whose target exists nowhere in the source tree is
+#   left as written and recorded in `report` (issue #11): generation
+#   cannot fix it, but the build report lists it so the author hears
+#   about it before a reader hits the 404.
 # `page_rel_dir` is the page directory relative to the site root,
 # `rendered` the set of root-relative markdown paths that become pages.
+# `report` is an optional environment whose `links` data frame collects
+# the missing targets (columns `file`, `target`, `resolved`); `page` names
+# the source file being rewritten, root-relative, for the `file` column.
 rewrite_links <- function(text, page_rel_dir, rendered, repo_url, root,
-                          aliases = character()) {
+                          aliases = character(), report = NULL, page = NULL) {
   rx <- "\\]\\(([^()[:space:]]+)\\)"
   match_all <- gregexpr(rx, text, perl = TRUE)
   targets <- regmatches(text, match_all)
   if (length(targets[[1]]) == 0) {
     return(text)
   }
+  record_missing <- function(target, resolved) {
+    if (is.environment(report)) {
+      report$links <- rbind(report$links, data.frame(
+        file = if (is.null(page)) NA_character_ else page,
+        target = target,
+        resolved = resolved,
+        stringsAsFactors = FALSE
+      ))
+    }
+  }
   rewritten <- vapply(targets[[1]], function(m) {
     target <- sub(rx, "\\1", m, perl = TRUE)
     if (grepl("^([a-zA-Z][a-zA-Z0-9+.-]*:|//|#|/)", target)) {
       return(m)
     }
+    written <- target
     anchor <- ""
     if (grepl("#", target, fixed = TRUE)) {
       anchor <- sub("^[^#]*", "", target)
@@ -70,6 +88,9 @@ rewrite_links <- function(text, page_rel_dir, rendered, repo_url, root,
     }
     resolved <- fs::path_norm(fs::path(page_rel_dir, target))
     if (grepl("^\\.\\.", resolved)) {
+      # Escapes the collection root: nothing in the source tree can be
+      # its target.
+      record_missing(written, as.character(resolved))
       return(m)
     }
     resolved <- as.character(resolved)
@@ -77,13 +98,22 @@ rewrite_links <- function(text, page_rel_dir, rendered, repo_url, root,
       new_rel <- as.character(fs::path_rel(aliases[[resolved]], page_rel_dir))
       return(paste0("](", new_rel, anchor, ")"))
     }
-    ext <- tolower(fs::path_ext(resolved))
-    if (resolved %in% rendered || ext %in% image_exts) {
+    if (resolved %in% rendered) {
       return(m)
     }
-    if (!is.na(repo_url) && fs::file_exists(fs::path(root, resolved))) {
-      return(paste0("](", blob_url(repo_url, resolved), anchor, ")"))
+    exists <- fs::file_exists(fs::path(root, resolved))
+    ext <- tolower(fs::path_ext(resolved))
+    if (ext %in% image_exts) {
+      if (!exists) record_missing(written, resolved)
+      return(m)
     }
+    if (exists) {
+      if (!is.na(repo_url)) {
+        return(paste0("](", blob_url(repo_url, resolved), anchor, ")"))
+      }
+      return(m)
+    }
+    record_missing(written, resolved)
     m
   }, character(1), USE.NAMES = FALSE)
   regmatches(text, match_all) <- list(rewritten)
