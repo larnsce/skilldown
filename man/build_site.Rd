@@ -20,5 +20,8 @@ Invisibly, the manifest from \code{\link[=generate_site]{generate_site()}}.
 \description{
 Regenerates the working directory (see \code{\link[=generate_site]{generate_site()}}), renders it
 with Quarto, and copies the result to \code{dest}. The collection itself is
-never modified.
+never modified. The build never fails on the content it finds: frontmatter
+it had to normalize, validation notes, and relative links whose target
+does not exist in the source tree are reported after the render so the
+author can fix them upstream.
 }

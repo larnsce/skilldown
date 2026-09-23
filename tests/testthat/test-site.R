@@ -1,14 +1,3 @@
-generate_fixture <- function(name, env = parent.frame()) {
-  src <- local_fixture(name, env = env)
-  work <- fs::path(withr::local_tempdir(.local_envir = env), "site")
-  manifest <- suppressWarnings(generate_site(src, work = work))
-  list(src = src, work = work, manifest = manifest)
-}
-
-read_work <- function(x, rel) {
-  paste(readLines(fs::path(x$work, rel), warn = FALSE), collapse = "\n")
-}
-
 test_that("generation snapshot: basic collection", {
   x <- generate_fixture("collection-basic")
   expect_snapshot(cat(sort(x$manifest$pages), sep = "\n"))
@@ -37,6 +26,23 @@ test_that("messy collection: reported, normalized, never fatal", {
   # The colon description survived normalization intact.
   page <- read_work(x, "skills/colon-notes/index.md")
   expect_match(page, "Collect notes: fetch, sort: then file them by topic.", fixed = TRUE)
+})
+
+test_that("links whose target is absent from the source are reported per file", {
+  x <- generate_fixture("collection-messy")
+  links <- x$manifest$broken_links
+  links <- links[order(links$file), , drop = FALSE]
+  expect_equal(links$file, c("CHANGELOG.md", "skills/colon-notes/SKILL.md", "skills/colon-notes/SKILL.md"))
+  expect_equal(links$target, c("SECURITY.md", "../../SECURITY.md", "diagram.png"))
+  expect_equal(links$resolved, c("SECURITY.md", "SECURITY.md", "skills/colon-notes/diagram.png"))
+  # Left as written in the working copy.
+  expect_match(read_work(x, "CHANGELOG.md"), "[security policy](SECURITY.md)", fixed = TRUE)
+  expect_match(read_work(x, "skills/colon-notes/index.md"), "[the policy](../../SECURITY.md)", fixed = TRUE)
+})
+
+test_that("a clean collection reports no broken links", {
+  x <- generate_fixture("collection-basic")
+  expect_equal(nrow(x$manifest$broken_links), 0)
 })
 
 test_that("nested layout renders one page per skill (flat index in v0.1)", {
